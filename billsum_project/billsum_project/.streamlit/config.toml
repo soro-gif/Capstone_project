@@ -1,0 +1,5 @@
+[server]
+# Transformers exposes optional vision modules lazily. Streamlit's source
+# watcher probes those modules and produces noisy `torchvision` errors even
+# though this text-only app does not use vision features.
+fileWatcherType = "none"

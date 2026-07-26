@@ -1,0 +1,15 @@
+TITRE I - DES OBLIGATIONS RELATIVES À LA PROTECTION DES DONNÉES DANS LE SECTEUR FINANCIER
+
+Article 1
+Les établissements de crédit et les institutions financières doivent mettre en place un système automatisé de détection des transactions suspectes dans un délai de 90 jours à compter de la promulgation de la présente loi.
+
+Article 2
+Toute entreprise ou organisation effectuant des opérations financières est tenue de conserver les registres d'audit pendant une période minimale de dix ans. Nonobstant toute disposition contraire, le non-respect de cette obligation est passible d'une amende pouvant atteindre 50 000 000 francs CFA.
+
+TITRE II - DE LA SÉCURITÉ CYBERNÉTIQUE ET DU RECOURS CONTENTIEUX
+
+Article 3
+Le responsable du traitement doit notifier l'autorité de régulation de tout incident majeur de sécurité au plus tard dans les 48 heures suivant sa découverte.
+
+Article 4
+Les bénéficiaires ayant droit de la protection des données disposent de plein droit d'un recours contentieux devant le tribunal compétent en cas d'accès non autorisé à leurs informations personnelles.
