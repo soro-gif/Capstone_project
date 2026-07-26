@@ -3,3 +3,9 @@
 # watcher probes those modules and produces noisy `torchvision` errors even
 # though this text-only app does not use vision features.
 fileWatcherType = "none"
+
+[theme]
+primaryColor = "#2E7D32"
+backgroundColor = "#F5811F"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#1A1A1A"

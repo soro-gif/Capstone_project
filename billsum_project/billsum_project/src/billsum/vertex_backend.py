@@ -66,3 +66,41 @@ def generate_with_vertex(text: str, audience: str) -> str:
         ),
     )
     return response.text.strip()
+
+
+_RAG_SYSTEM_INSTRUCTION = (
+    "Tu es un assistant juridique. Réponds à la question de l'utilisateur en te "
+    "basant UNIQUEMENT sur les extraits de sites officiels fournis ci-dessous. "
+    "Cite systématiquement, pour chaque affirmation, la source dont elle provient "
+    "(titre et URL). Si les extraits fournis ne permettent pas de répondre, "
+    "dis-le explicitement — n'invente aucune disposition légale absente du "
+    "contexte fourni."
+)
+
+
+def answer_with_web_sources(question: str, sources, max_output_tokens: int = 600) -> str:
+    """Génère une réponse à une question, citant des pages web officielles (RAG).
+
+    sources : liste de {title, link, text} (voir web_search.py / rag.py).
+    """
+    from google.genai import types
+
+    client = _get_client()
+    context = "\n\n".join(
+        f"[{s['title']} — {s['link']}]\n{s['text']}" for s in sources
+    )
+    prompt = (
+        f"{_RAG_SYSTEM_INSTRUCTION}\n\n"
+        f"Sources disponibles :\n{context}\n\n"
+        f"Question : {question}"
+    )
+    response = client.models.generate_content(
+        model=VERTEX_ENDPOINT,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            max_output_tokens=max_output_tokens,
+            temperature=0.2,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        ),
+    )
+    return response.text.strip()
