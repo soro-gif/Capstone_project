@@ -16,6 +16,7 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 import streamlit as st
 
 from billsum.extract import extract_text
+from billsum.interpret import interpret_for_audience
 from billsum.multipublic import FR_MODEL_NAME, load_model, summarize_for_audience
 from billsum.rag import answer_question
 from billsum.web_search import OFFICIAL_SITES, WebSearchNotConfigured
@@ -59,12 +60,23 @@ tab_summary, tab_rag = st.tabs([":material/auto_awesome: Résumés", ":material/
 
 with st.sidebar:
     st.subheader("Paramètres")
-    backend_label = st.radio(
-        "Modèle",
-        ["T5 local (rapide)", "Gemini fine-tuné (Vertex AI)"],
+    mode = st.radio(
+        "Mode",
+        ["Résumé", "Interprétation"],
         index=0,
+        help="Résumé : condense le texte. Interprétation : explique le sens, "
+             "les obligations/droits et les implications de chaque article.",
     )
-    backend = "vertex" if backend_label.startswith("Gemini") else "t5"
+    if mode == "Résumé":
+        backend_label = st.radio(
+            "Modèle",
+            ["T5 local (rapide)", "Gemini fine-tuné (Vertex AI)"],
+            index=0,
+        )
+        backend = "vertex" if backend_label.startswith("Gemini") else "t5"
+    else:
+        backend = "vertex"
+        st.caption("L'interprétation utilise le modèle Gemini (Vertex AI).")
     audience = st.pills(
         "Public",
         ["JURISTE", "DIRIGEANT", "CITOYEN"],
@@ -72,11 +84,13 @@ with st.sidebar:
         default="JURISTE",
     )
     audiences = [audience] if audience else []
-    check_factuality = st.toggle(
-        "Vérifier les hallucinations (NLI)", value=False,
-        help="Vérifie que chaque phrase du résumé est bien soutenue par le texte source. "
-             "Télécharge un modèle NLI multilingue au premier lancement.",
-    )
+    check_factuality = False
+    if mode == "Résumé":
+        check_factuality = st.toggle(
+            "Vérifier les hallucinations (NLI)", value=False,
+            help="Vérifie que chaque phrase du résumé est bien soutenue par le texte source. "
+                 "Télécharge un modèle NLI multilingue au premier lancement.",
+        )
 
 with tab_summary:
     st.session_state.setdefault("bill_text", "")
@@ -99,13 +113,33 @@ with tab_summary:
             placeholder="Collez ici le texte intégral du projet de loi (FR), ou importez un document ci-dessus.",
             key="bill_text",
         )
-        submitted = st.form_submit_button("Générer les résumés", icon=":material/auto_awesome:", type="primary")
+        submit_label = "Générer les résumés" if mode == "Résumé" else "Interpréter les articles"
+        submitted = st.form_submit_button(submit_label, icon=":material/auto_awesome:", type="primary")
 
     if submitted:
         if not text.strip():
             st.warning("Veuillez coller un texte de loi avant de générer un résumé.")
         elif not audiences:
             st.warning("Sélectionnez au moins un public.")
+        elif mode == "Interprétation":
+            tabs = st.tabs([f"{a.capitalize()}" for a in audiences])
+            for tab, audience in zip(tabs, audiences):
+                with tab:
+                    try:
+                        with st.spinner(f"Interprétation pour le public {audience.lower()}..."):
+                            result = interpret_for_audience(text, audience)
+                    except Exception as e:
+                        st.error(
+                            "Échec de l'appel au modèle Gemini (Vertex AI). "
+                            "Vérifiez l'authentification (`gcloud auth application-default login`) "
+                            f"et votre connexion réseau.\n\nDétail : {e}"
+                        )
+                        continue
+
+                    for art in result.articles:
+                        with st.container(border=True):
+                            st.markdown(f"**{art.header}**")
+                            st.markdown(art.interpretation)
         else:
             try:
                 model, tokenizer = (None, None) if backend == "vertex" else get_model(FR_MODEL_NAME)

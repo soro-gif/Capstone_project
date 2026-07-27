@@ -109,3 +109,6 @@ l'embedder + le modèle NLI en multilingue.
 
 BillSum — https://github.com/FiscalNote/BillSum
 Textes de loi US (domaine public). Vérifier la licence pour tout usage commercial.
+## Lancer l'app avec streamlit
+Pour lancer l'app exécutez la commande
+streamlit run streamlit_app.py

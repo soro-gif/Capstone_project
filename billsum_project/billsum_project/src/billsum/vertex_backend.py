@@ -68,6 +68,57 @@ def generate_with_vertex(text: str, audience: str) -> str:
     return response.text.strip()
 
 
+_INTERPRET_SYSTEM_INSTRUCTIONS = {
+    "JURISTE": (
+        "Tu es un assistant qui interprète un article de loi pour un juriste. "
+        "Pour l'extrait fourni, explique son sens exact, les obligations et droits "
+        "qu'il crée, les exceptions éventuelles, et les éventuelles ambiguïtés "
+        "d'interprétation. Ne simplifie pas le vocabulaire juridique."
+    ),
+    "DIRIGEANT": (
+        "Tu es un assistant qui interprète un article de loi pour un dirigeant "
+        "d'entreprise. Pour l'extrait fourni, explique ce qu'il signifie concrètement "
+        "pour une entreprise : obligations à respecter, risques en cas de "
+        "non-conformité, actions à prévoir. Sois concis et évite le jargon juridique "
+        "inutile."
+    ),
+    "CITOYEN": (
+        "Tu es un assistant qui interprète un article de loi en langage simple pour "
+        "un citoyen sans formation juridique. Pour l'extrait fourni, explique ce que "
+        "cela signifie pour lui dans la vie quotidienne, avec des phrases courtes et "
+        "sans jargon technique."
+    ),
+}
+
+_INTERPRET_MAX_TOKENS = {"JURISTE": 400, "DIRIGEANT": 300, "CITOYEN": 250}
+
+_INTERPRET_MODEL = "gemini-2.5-flash"
+
+
+def interpret_article_with_vertex(article_text: str, audience: str) -> str:
+    """Interprète un extrait (article/section) en langage clair pour un public donné.
+
+    Utilise le modèle Gemini de base (pas l'endpoint fine-tuné pour le résumé,
+    qui n'est pas adapté à cette tâche) via des instructions système dédiées.
+    """
+    from google.genai import types
+
+    audience = audience.upper()
+    client = _get_client()
+    system = _INTERPRET_SYSTEM_INSTRUCTIONS.get(audience, _INTERPRET_SYSTEM_INSTRUCTIONS["JURISTE"])
+    prompt = f"{system}\n\nExtrait du texte de loi :\n{article_text}"
+    response = client.models.generate_content(
+        model=_INTERPRET_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            max_output_tokens=_INTERPRET_MAX_TOKENS.get(audience, 350),
+            temperature=0.2,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        ),
+    )
+    return response.text.strip()
+
+
 _RAG_SYSTEM_INSTRUCTION = (
     "Tu es un assistant juridique. Réponds à la question de l'utilisateur en te "
     "basant UNIQUEMENT sur les extraits de sites officiels fournis ci-dessous. "
