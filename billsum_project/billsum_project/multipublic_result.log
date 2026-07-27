@@ -1,6 +1,0 @@
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Device: cpu | Modèle: sorolamoussa/t5-small-billsum-fr
-Loading weights:   0%|          | 0/131 [00:00<?, ?it/s]Loading weights: 100%|██████████| 131/131 [00:00<00:00, 2967.65it/s]
-[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (6139 > 512). Running this sequence through the model will result in indexing errors
-Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 4290.40it/s]
-Loading weights:   0%|          | 0/202 [00:00<?, ?it/s]Loading weights:  46%|████▌     | 92/202 [00:00<00:00, 905.67it/s]Loading weights: 100%|██████████| 202/202 [00:00<00:00, 1339.27it/s]

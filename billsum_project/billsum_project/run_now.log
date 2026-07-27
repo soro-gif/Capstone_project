@@ -1,45 +1,0 @@
-2026-07-27 11:05:04.211 Uvicorn server started on 0.0.0.0:8501
-2026-07-27 11:05:19.027 Did not auto detect external IP.
-Please go to https://docs.streamlit.io/ for debugging hints.
-
-  You can now view your Streamlit app in your browser.
-
-  Local URL: http://localhost:8501
-  Network URL: http://192.168.1.101:8501
-
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights:   0%|          | 0/131 [00:00<?, ?it/s]Loading weights: 100%|##########| 131/131 [00:00<00:00, 1457.72it/s]
-Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|##########| 199/199 [00:00<00:00, 5730.55it/s]
-+------------------------- Traceback (most recent call last) --------------------------+
-| C:\Users\LAMOUSSASORO\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\stre |
-| amlit\runtime\scriptrunner\exec_code.py:129 in exec_func_with_error_handling         |
-|                                                                                      |
-| C:\Users\LAMOUSSASORO\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\stre |
-| amlit\runtime\scriptrunner\script_runner.py:789 in code_to_exec                      |
-|                                                                                      |
-| C:\Users\LAMOUSSASORO\Desktop\Capstone_project\billsum_project\billsum_project\strea |
-| mlit_app.py:19 in <module>                                                           |
-|                                                                                      |
-|    16 import streamlit as st                                                         |
-|    17                                                                                |
-|    18 from billsum.extract import extract_text                                       |
-| >  19 from billsum.multipublic import FR_MODEL_NAME, load_model, summarize_for_audie |
-|    20 from billsum.rag import answer_question                                        |
-|    21 from billsum.web_search import OFFICIAL_SITES, WebSearchNotConfigured          |
-|    22                                                                                |
-|                                                                                      |
-| C:\Users\LAMOUSSASORO\Desktop\Capstone_project\billsum_project\billsum_project\src\b |
-| illsum\interpret.py:12 in <module>                                                   |
-|                                                                                      |
-|    9 from dataclasses import dataclass, field                                        |
-|   10                                                                                 |
-|   11 from .sections import split_sections                                            |
-| > 12 from .vertex_backend import interpret_article_with_vertex                       |
-|   13                                                                                 |
-|   14                                                                                 |
-|   15 @dataclass                                                                      |
-+--------------------------------------------------------------------------------------+
-ImportError: cannot import name 'interpret_article_with_vertex' from 
-'billsum.vertex_backend' 
-(C:\Users\LAMOUSSASORO\Desktop\Capstone_project\billsum_project\billsum_project\src\bill
-sum\vertex_backend.py)
