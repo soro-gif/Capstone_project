@@ -15,21 +15,32 @@ VERTEX_PROJECT = "project-12661c0f-93ef-4036-bb0"
 VERTEX_LOCATION = "us-central1"
 VERTEX_ENDPOINT = "projects/937895719900/locations/us-central1/endpoints/890169561649774592"
 
+_ANTI_HALLUCINATION = (
+    " N'utilise que les informations explicitement présentes dans le texte fourni : "
+    "n'ajoute aucun fait, chiffre, date, sanction ou obligation qui n'y figure pas "
+    "littéralement, même s'il te semble plausible ou habituel dans ce type de loi. "
+    "Si un point est ambigu ou absent du texte, ne l'invente pas et omets-le plutôt "
+    "que de le déduire."
+)
+
 _SYSTEM_INSTRUCTIONS = {
     "JURISTE": (
         "Tu es un assistant qui résume des projets de loi de façon précise et "
         "complète, à destination d'un juriste. Conserve toutes les obligations "
         "légales, exceptions et références précises. Ne simplifie pas le vocabulaire."
+        + _ANTI_HALLUCINATION
     ),
     "DIRIGEANT": (
         "Tu es un assistant qui résume des projets de loi à destination d'un "
         "dirigeant d'entreprise. Sois concis, concentre-toi sur les impacts "
         "opérationnels et obligations concrètes, sans jargon juridique inutile."
+        + _ANTI_HALLUCINATION
     ),
     "CITOYEN": (
         "Tu es un assistant qui résume des projets de loi en langage simple pour "
         "un citoyen sans formation juridique. Utilise des phrases courtes et évite "
         "le jargon technique."
+        + _ANTI_HALLUCINATION
     ),
 }
 
@@ -55,13 +66,18 @@ def generate_with_vertex(text: str, audience: str) -> str:
     audience = audience.upper()
     client = _get_client()
     system = _SYSTEM_INSTRUCTIONS.get(audience, _SYSTEM_INSTRUCTIONS["JURISTE"])
-    prompt = f"{system}\n\nTexte du projet de loi :\n{text}"
+    # L'endpoint fine-tuné (VERTEX_ENDPOINT) n'obéit pas à l'instruction système
+    # et se contente de traduire/reformuler le texte quasi mot pour mot au lieu
+    # de le résumer (vérifié empiriquement en comparant les deux sorties sur un
+    # même prompt). On utilise donc le modèle Gemini de base, comme pour
+    # interpret_article_with_vertex, qui respecte correctement les instructions.
     response = client.models.generate_content(
-        model=VERTEX_ENDPOINT,
-        contents=prompt,
+        model=_INTERPRET_MODEL,
+        contents=text,
         config=types.GenerateContentConfig(
+            system_instruction=system,
             max_output_tokens=_MAX_TOKENS.get(audience, 400),
-            temperature=0.2,
+            temperature=0.0,
             thinking_config=types.ThinkingConfig(thinking_budget=0),
         ),
     )

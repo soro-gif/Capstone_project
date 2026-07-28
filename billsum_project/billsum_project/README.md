@@ -4,7 +4,6 @@ Fine-tuning LoRA pour la **summarization contrôlée** de textes législatifs, a
 contrôle des hallucinations et couverture des obligations légales.
 Un même projet de loi → résumés adaptés à plusieurs publics (juriste, dirigeant, citoyen).
 
-**Baobab Labs**
 
 ## Structure
 

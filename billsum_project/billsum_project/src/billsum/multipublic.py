@@ -72,7 +72,9 @@ def _dedupe_repeated_sentences(text: str) -> str:
     return text
 
 
-def _generate_single_chunk(model, tokenizer, text, profile, device, max_source_len=512):
+def _generate_single_chunk(model, tokenizer, text, profile, device, max_source_len=512,
+                           num_beams=4, no_repeat_ngram_size=5, repetition_penalty=1.15,
+                           length_penalty=1.0):
     import torch
 
     enc = tokenizer(
@@ -81,47 +83,60 @@ def _generate_single_chunk(model, tokenizer, text, profile, device, max_source_l
         truncation=True,
         return_tensors="pt",
     ).to(device)
+
+    # Un extrait court (ex. un seul article bref) ne justifie pas un résumé de
+    # min_new_tokens fixe : forcer une longueur minimale au-delà de ce que le
+    # texte source permet pousse le modèle à halluciner du contenu hors sujet
+    # pour "remplir". On adapte donc ce plancher à la longueur de l'entrée,
+    # sans toucher à max_new_tokens (early_stopping laisse le modèle s'arrêter
+    # naturellement, et max_new_tokens reste le levier de différenciation par public).
+    source_len = enc["input_ids"].shape[1]
+    min_new_tokens = min(profile.min_new_tokens, max(3, source_len // 2))
+
     with torch.no_grad():
         gen = model.generate(
             **enc,
             max_new_tokens=profile.max_new_tokens,
-            min_new_tokens=profile.min_new_tokens,
-            num_beams=4,
-            no_repeat_ngram_size=5,
-            repetition_penalty=1.15,
+            min_new_tokens=min_new_tokens,
+            num_beams=num_beams,
+            no_repeat_ngram_size=no_repeat_ngram_size,
+            repetition_penalty=repetition_penalty,
             early_stopping=True,
-            length_penalty=1.0,
+            length_penalty=length_penalty,
         )
     raw = tokenizer.batch_decode(gen, skip_special_tokens=True)[0]
     return _clean_output(raw)
 
 
 def _get_section_content(header: str, body: str) -> str:
-    """Extrait le contenu utile d'une section en retirant la ligne d'en-tête répétée.
+    """Extrait le contenu utile d'une section en retirant l'en-tête répété.
+
+    `body` commence toujours par `header` (voir `split_sections`), qu'il soit
+    suivi d'un saut de ligne ("Article 1\nLe texte...") ou, cas le plus
+    fréquent, directement du texte sur la même ligne ("Article 1er. Le
+    texte..."). On retire donc uniquement le préfixe `header`, jamais la
+    ligne entière : la retirer entièrement effacerait aussi le contenu réel
+    quand il suit l'en-tête sans saut de ligne.
 
     Retourne une chaîne vide si la section ne contient pas de contenu propre
-    (ex. section TITRE qui n'a pas d'articles entre le header et le suivant).
+    au-delà de l'en-tête (ex. section TITRE qui n'a pas d'articles entre le
+    header et le suivant).
     """
     import re
 
-    lines = [l for l in body.split("\n") if l.strip()]
-    if not lines:
-        return ""
-    # La première ligne est souvent l'en-tête repris : "TITRE I - ...", "Article 1"
-    first = lines[0].strip()
-    if re.match(r"^(TITRE|CHAPITRE|ARTICLE|SECTION)\s+\w+", first, re.IGNORECASE):
-        # Retirer la ligne d'en-tête ; retourner "" si rien ne suit (section titre vide)
-        return "\n".join(lines[1:]).strip()
-    return body
+    body = body.strip()
+    rest = body.removeprefix(header)
+    rest = re.sub(r"^[\s.:\-–—]+", "", rest)
+    return rest.strip()
 
 
-def _generate(model, tokenizer, text, profile, device, max_source_len=512):
+def _generate(model, tokenizer, text, profile, device, max_source_len=512, **gen_kwargs):
     """Génère un résumé complet, section par section."""
     sections = split_sections(text)
 
     # Texte sans sections identifiables : chemin direct
     if len(sections) <= 1:
-        return _generate_single_chunk(model, tokenizer, text, profile, device, max_source_len=max_source_len)
+        return _generate_single_chunk(model, tokenizer, text, profile, device, max_source_len=max_source_len, **gen_kwargs)
 
     # Résumé indépendant de chaque section (contenu sans en-tête répété)
     section_summaries = []
@@ -130,7 +145,7 @@ def _generate(model, tokenizer, text, profile, device, max_source_len=512):
         if not content.strip():
             continue
         sec_sum = _generate_single_chunk(
-            model, tokenizer, content, profile, device, max_source_len=max_source_len
+            model, tokenizer, content, profile, device, max_source_len=max_source_len, **gen_kwargs
         )
         sec_sum = sec_sum.strip()
         if sec_sum:
@@ -139,7 +154,7 @@ def _generate(model, tokenizer, text, profile, device, max_source_len=512):
             section_summaries.append(sec_sum)
 
     if not section_summaries:
-        summary = _generate_single_chunk(model, tokenizer, text, profile, device, max_source_len=max_source_len)
+        summary = _generate_single_chunk(model, tokenizer, text, profile, device, max_source_len=max_source_len, **gen_kwargs)
     else:
         combined = " ".join(section_summaries)
         comb_tokens = tokenizer(combined, truncation=False, return_tensors="pt").input_ids.shape[1]
@@ -148,7 +163,7 @@ def _generate(model, tokenizer, text, profile, device, max_source_len=512):
         if comb_tokens <= 1024:
             summary = combined
         else:
-            summary = _generate_single_chunk(model, tokenizer, combined, profile, device, max_source_len=max_source_len)
+            summary = _generate_single_chunk(model, tokenizer, combined, profile, device, max_source_len=max_source_len, **gen_kwargs)
 
     return summary
 
@@ -183,7 +198,11 @@ def _section_coverage(sections, summary, device, lang="fr", threshold=0.4):
 def summarize_for_audience(text: str, audience: str, model=None, tokenizer=None,
                            device="cpu", model_name: str = FR_MODEL_NAME,
                            check_factuality: bool = True,
-                           backend: str = "t5") -> SummaryResult:
+                           check_omissions: bool = True,
+                           backend: str = "t5",
+                           num_beams: int = 4, no_repeat_ngram_size: int = 5,
+                           repetition_penalty: float = 1.15,
+                           length_penalty: float = 1.0) -> SummaryResult:
     """Résumé pour un public donné, avec traçabilité des sections et
     vérification anti-hallucination. Ne produit pas d'interprétation
     juridique non sourcée : le résumé provient uniquement du modèle
@@ -192,6 +211,10 @@ def summarize_for_audience(text: str, audience: str, model=None, tokenizer=None,
 
     backend: "t5" (modèle local sorolamoussa/t5-small-billsum-fr, par section)
              ou "vertex" (Gemini fine-tuné sur Vertex AI, document entier).
+
+    num_beams/no_repeat_ngram_size/repetition_penalty/length_penalty :
+    paramètres de decoding, exposés pour permettre des essais comparatifs
+    (voir scripts/run_eval.py) sans devoir modifier le code.
     """
     profile = get_profile(audience)
 
@@ -202,16 +225,22 @@ def summarize_for_audience(text: str, audience: str, model=None, tokenizer=None,
     else:
         if model is None or tokenizer is None:
             model, tokenizer = load_model(model_name, device)
-        raw_summary = _generate(model, tokenizer, text, profile, device)
+        raw_summary = _generate(
+            model, tokenizer, text, profile, device,
+            num_beams=num_beams, no_repeat_ngram_size=no_repeat_ngram_size,
+            repetition_penalty=repetition_penalty, length_penalty=length_penalty,
+        )
 
     summary = postprocess(raw_summary, profile)
 
-    sections = split_sections(text)
-    covered, omitted = _section_coverage(sections, summary, device)
-
-    cov, cov_details = obligation_coverage(
-        text, summary, threshold=0.5, device=device, lang="fr", return_details=True
-    )
+    covered, omitted = [], []
+    cov = None
+    if check_omissions:
+        sections = split_sections(text)
+        covered, omitted = _section_coverage(sections, summary, device)
+        cov, _cov_details = obligation_coverage(
+            text, summary, threshold=0.5, device=device, lang="fr", return_details=True
+        )
 
     unsupported = []
     hrate = None
@@ -235,7 +264,7 @@ def summarize_for_audience(text: str, audience: str, model=None, tokenizer=None,
 
 
 def generate_report(text: str, audiences=("JURISTE", "CITOYEN"), device="cpu",
-                    model_name: str = FR_MODEL_NAME) -> dict:
+                    model_name: str = FR_MODEL_NAME, **gen_kwargs) -> dict:
     """Résumé exécutif (JURISTE) + résumé citoyen (CITOYEN) par défaut,
     avec traçabilité des sections couvertes/omises pour chacun.
     """
@@ -244,6 +273,6 @@ def generate_report(text: str, audiences=("JURISTE", "CITOYEN"), device="cpu",
     for aud in audiences:
         results[aud] = summarize_for_audience(
             text, aud, model=model, tokenizer=tokenizer, device=device,
-            model_name=model_name,
+            model_name=model_name, **gen_kwargs,
         )
     return results
