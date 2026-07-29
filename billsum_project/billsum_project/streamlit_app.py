@@ -146,7 +146,7 @@ with tab_summary:
             placeholder="Collez ici le texte intégral du projet de loi (FR), ou importez un document ci-dessus.",
             key="bill_text",
         )
-        submit_label = "Générer les résumés" if mode == "Résumé" else "Interpréter les articles"
+        submit_label = "Générer le résumé" if mode == "Résumé" else "Interpréter l'article"
         submitted = st.form_submit_button(submit_label, icon=":material/auto_awesome:", type="primary")
 
     # Les résultats sont calculés à la soumission puis stockés dans st.session_state :
